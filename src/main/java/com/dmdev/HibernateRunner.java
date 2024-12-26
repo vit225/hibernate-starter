@@ -1,39 +1,40 @@
 package com.dmdev;
 
-import com.dmdev.converter.BirthdayConverter;
 import com.dmdev.entity.User;
-import com.vladmihalcea.hibernate.type.json.JsonBinaryType;
+import com.dmdev.util.HibernateUtil;
 import org.hibernate.Session;
 import org.hibernate.SessionFactory;
-import org.hibernate.cfg.Configuration;
+import org.hibernate.Transaction;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class HibernateRunner {
 
+    public static final Logger log = LoggerFactory.getLogger(HibernateRunner.class);
+
     public static void main(String[] args) {
-        Configuration configuration = new Configuration();
-        configuration.addAttributeConverter(new BirthdayConverter());
-        configuration.registerTypeOverride(new JsonBinaryType());
-        configuration.configure();
-        try (SessionFactory sessionFactory = configuration.buildSessionFactory();
-             Session session = sessionFactory.openSession()) {
-            session.beginTransaction();
+        User user = User.builder()
+                .username("ivan@gmail.com")
+                .lastname("Ivanov")
+                .firstname("Ivan")
+                .build();
+        log.info("User entity is in transient state, object: {}", user);
 
-//            User user = User.builder()
-//                    .username("ivan9@gmail.com")
-//                    .firstname("Ivan")
-//                    .lastname("Ivanov")
-//                    .info("""
-//                            {
-//                                "name": "Ivan",
-//                                "id": 25
-//                            }
-//                            """)
-//                    .birthDate(new Birthday(LocalDate.of(2000, 1, 19)))
-//                    .role(Role.ADMIN)
-//                    .build();
-            User user = session.get(User.class, "ivan@gmail.com");
+        try (SessionFactory sessionFactory = HibernateUtil.buildSessionFactory()) {
+            Session session1 = sessionFactory.openSession();
+            try (session1) {
+                Transaction transaction = session1.beginTransaction();
+                log.trace("Transaction is created, {}", transaction);
 
-            session.getTransaction().commit();
+                session1.saveOrUpdate(user);
+                log.trace("Transaction is persistent state: {}, session {}", user, session1);
+
+                session1.getTransaction().commit();
+            }
+            log.warn("User is in detached state: {}, session is closed {}", user, session1);
+        } catch (Exception exeption) {
+            log.error("Exception occurred", exeption);
+            throw exeption;
         }
     }
 }
